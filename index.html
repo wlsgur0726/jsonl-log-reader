@@ -203,7 +203,7 @@
     }
 
     // 설정을 로컬 스토리지에 저장하는 함수
-    function saveSettingsToLocalStorage() {
+    function saveSettingsToLocalStorage(isInit) {
         const settings = {
             timestampField: document.getElementById('timestampField').value,
             timestampFormat: document.getElementById('timestampFormat').value,
@@ -214,7 +214,8 @@
             localStorage.setItem('fileList', JSON.stringify(fileNames));
         else
             clearSavedRecentState();
-        alert('saved settings');
+        if (!isInit)
+            alert('saved settings');
     }
 
     // 로컬 스토리지에서 설정을 로드하는 함수
@@ -224,6 +225,9 @@
             document.getElementById('timestampField').value = savedSettings.timestampField || defaultSettings.timestampField;
             document.getElementById('timestampFormat').value = savedSettings.timestampFormat || defaultSettings.timestampFormat;
             document.getElementById('saveRecentState').checked = savedSettings.saveRecentState !== undefined ? savedSettings.saveRecentState : defaultSettings.saveRecentState;
+        }
+        else {
+            saveSettingsToLocalStorage(true);
         }
     }
 
