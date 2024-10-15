@@ -101,432 +101,564 @@
         }
     </style>
 </head>
+
 <body>
 
-<h1>JSONL Log Reader</h1>
-<hr/>
+    <h1>JSONL Log Reader</h1>
+    <hr />
 
-<div class="collapsible" onclick="toggleSection('fileSection')">Files</div>
-<div id="fileSection" class="content">
-    <input type="file" id="fileInput" multiple accept=".jsonl">
-    <button id="clearButton" class="common-button">Clear</button> <!-- 클리어 버튼 -->
-    <ul id="fileList"></ul>
-</div>
-
-<div class="collapsible" onclick="toggleSection('settingsSection')">Settings</div>
-<div id="settingsSection" class="content">
-    <p>
-        <table>
-            <tr><!-- 마지막 쿼리 저장 여부 -->
-                <td class="setting"><label>Save Recent State</label></td>
-                <td class="setting"><input type="checkbox" id="saveRecentState" checked></td>
-            </tr>
-            <tr><!-- 타임스탬프 필드명 지정 -->
-                <td class="setting"><label>Timestamp Field Name</label></td>
-                <td class="setting"><input type="text" id="timestampField" value="timestamp"></td>
-            </tr>
-            <tr><!-- 타임스탬프 출력 양식 -->
-                <td class="setting"><label>Timestamp Format</label></td>
-                <td class="setting">
-                    <select id="timestampFormat">
-                        <option value="toISOString" selected>toISOString</option>
-                        <option value="toLocaleString">toLocaleString</option>
-                        <option value="toUnixTimeStamp">toUnixTimeStamp</option>
-                  </select>
-                </td>
-            </tr>
-        </table>
-    </p>
-    <button id="applySettings" class="common-button">Apply</button> <!-- 설정 적용 버튼 -->
-    <button id="discardSettings" class="common-button">Discard</button> <!-- 설정 되돌리기 버튼 -->
-    <button id="defaultSettings" class="common-button">Default</button> <!-- 설정 기본값 버튼 -->
-</div>
-
-<div class="collapsible" onclick="toggleSection('querySection')">Query</div>
-<div id="querySection" class="content">
-    <p>
-        <a href="https://github.com/techfort/LokiJS/wiki/Query-Examples" target="_blank">
-            LokiJS Query Syntax Documentation
-        </a>
-    </p>
-    <div class="query-container">
-        <button id="runQuery" class="common-button">Exec</button> <!-- 쿼리 실행 버튼 -->
-        <textarea id="queryBox">logs.find({})</textarea> <!-- 기본값 -->
+    <div class="collapsible" onclick="toggleSection('fileSection')">Files</div>
+    <div id="fileSection" class="content">
+        <input type="file" id="fileInput" multiple accept=".jsonl">
+        <button id="clearButton" class="common-button">Clear</button> <!-- 클리어 버튼 -->
+        <ul id="fileList"></ul>
     </div>
-</div>
 
-<hr/>
+    <div class="collapsible" onclick="toggleSection('settingsSection')">Settings</div>
+    <div id="settingsSection" class="content">
+        <p>
+            <label id="version"></label>
+            <table id="settingsTable"></table>
+        </p>
+        <button id="applySettings" class="common-button">Apply</button> <!-- 설정 적용 버튼 -->
+        <button id="discardSettings" class="common-button">Discard</button> <!-- 설정 되돌리기 버튼 -->
+        <button id="defaultSettings" class="common-button">Default</button> <!-- 설정 기본값 버튼 -->
+    </div>
 
-<div id="resultSection" class="content" style="display: block;">
-    Results: <span id="resultCount">0 / 0</span>
-    <button id="exportCSV" class="common-button">Export as CSV</button>
-</div>
+    <div class="collapsible" onclick="toggleSection('querySection')">Query</div>
+    <div id="querySection" class="content">
+        <p>
+            <a href="https://github.com/techfort/LokiJS/wiki/Query-Examples" target="_blank">
+                LokiJS Query Syntax Documentation
+            </a>
+        </p>
+        <div class="query-container">
+            <button id="runQuery" class="common-button">Exec</button> <!-- 쿼리 실행 버튼 -->
+            <textarea id="queryBox">logs.find({})</textarea> <!-- 기본값 -->
+        </div>
+    </div>
 
-<table id="outputTable">
-    <thead>
-        <tr id="tableHeader"></tr>
-    </thead>
-    <tbody id="tableBody">
-    </tbody>
-</table>
+    <hr />
 
-<!-- LokiJS 라이브러리 로드 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/lokijs/1.5.12/lokijs.min.js"></script>
-<script>
-    let db = new loki('jsonl.db'); // LokiJS DB 초기화
-    let logs; // 로그 컬렉션 변수
-    let fileNames = []; // 로드한 파일들
-    let currentResult = []; // 현재 쿼리 결과 저장 변수
+    <div id="resultSection" class="content" style="display: block;">
+        Results: <span id="resultCount">0 / 0</span>
+        <button id="exportCSV" class="common-button">Export as CSV</button>
+    </div>
 
-    // 기본 설정값
-    const defaultSettings = {
-        timestampField: 'timestamp',
-        timestampFormat: 'toISOString',
-        saveRecentState: true,
-    };
+    <table id="outputTable">
+        <thead>
+            <tr id="tableHeader"></tr>
+        </thead>
+        <tbody id="tableBody">
+        </tbody>
+    </table>
 
-    // 페이지 로드 시 실행
-    window.onload = function() {
-        initializeDatabase(); // DB 및 컬렉션 초기화
-        loadSettingsFromLocalStorage(); // 설정 로드
-        loadFromLocalStorage(); // LocalStorage에서 데이터 로드
-    };
+    <!-- LokiJS 라이브러리 로드 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lokijs/1.5.12/lokijs.min.js"></script>
+    <script>
+        const version = '20241016';
 
-    // DB 및 컬렉션 초기화
-    function initializeDatabase() {
-        logs = db.getCollection('logs'); // logs 컬렉션이 존재하는지 확인
+        let db = new loki('jsonl.db'); // LokiJS DB 초기화
+        let logs; // 로그 컬렉션 변수
+        let fileNames = []; // 로드한 파일들
+        let currentResults = []; // 현재 쿼리 결과 저장 변수
+        let currentFields = []; // 현재 쿼리 결과의 필드들 저장 변수
 
-        if (!logs)
-            logs = db.addCollection('logs'); // 컬렉션이 없으면 생성
-        else
-            logs.clear(); // 이미 존재하면 초기화
-    }
+        // 설정들
+        const settings = {};
 
-    // 설정을 로컬 스토리지에 저장하는 함수
-    function saveSettingsToLocalStorage(isInit) {
-        const settings = {
-            timestampField: document.getElementById('timestampField').value,
-            timestampFormat: document.getElementById('timestampFormat').value,
-            saveRecentState: document.getElementById('saveRecentState').checked,
+        function renderSetting(id) {
+            const setting = settings[id];
+            return setting.render(`settings.${id}`);
+        }
+
+        function getSettingValue(id) {
+            const setting = settings[id];
+            const element = document.getElementById(`settings.${id}`);
+            return setting.get(element);
+        }
+
+        function setSettingValue(id, value) {
+            const setting = settings[id];
+            const element = document.getElementById(`settings.${id}`);
+            return setting.set(element, value);
+        }
+
+        // 마지막 쿼리 저장 여부
+        settings.saveRecentState = {
+            displayName: 'Save Recent State',
+            render: function (id) {
+                return `<input type="checkbox" id="${id}" checked />`;
+            },
+            get: function (element) {
+                return element.checked;
+            },
+            set: function (element, value) {
+                element.checked = value;
+            },
         };
-        localStorage.setItem('settings', JSON.stringify(settings));
-        if (enableSaveRecentState())
-            localStorage.setItem('fileList', JSON.stringify(fileNames));
-        else
-            clearSavedRecentState();
-        if (!isInit)
-            alert('saved settings');
-    }
 
-    // 로컬 스토리지에서 설정을 로드하는 함수
-    function loadSettingsFromLocalStorage() {
-        const savedSettings = JSON.parse(localStorage.getItem('settings'));
-        if (savedSettings) {
-            document.getElementById('timestampField').value = savedSettings.timestampField || defaultSettings.timestampField;
-            document.getElementById('timestampFormat').value = savedSettings.timestampFormat || defaultSettings.timestampFormat;
-            document.getElementById('saveRecentState').checked = savedSettings.saveRecentState !== undefined ? savedSettings.saveRecentState : defaultSettings.saveRecentState;
+        // 타임스탬프 필드명 지정
+        settings.timestampField = {
+            displayName: 'Timestamp Field Name',
+            render: function (id) {
+                return `<input type="text" id="${id}" value="timestamp">`;
+            },
+            get: function (element) {
+                return element.value;
+            },
+            set: function (element, value) {
+                element.value = value;
+            },
+        };
+
+        // 타임스탬프 출력 양식
+        settings.timestampFormat = {
+            displayName: 'Timestamp Format',
+            render: function (id) {
+                var html = '';
+                html += `<select id="${id}">`
+                html += `    <option value="toISOString" selected>  toISOString     </option>`;
+                html += `    <option value="toLocaleString">        toLocaleString  </option>`;
+                html += `    <option value="toUnixTimeStamp">       toUnixTimeStamp </option>`;
+                html += `</select>`;
+                return html;
+            },
+            get: function (element) {
+                return element.value;
+            },
+            set: function (element, value) {
+                element.value = value;
+            },
+        };
+
+        // 필드 순서
+        settings.fieldOrders = {
+            displayName: 'Field Orders',
+            defaultValue: {
+                level: 0,
+                message: 1,
+            },
+            render: function (id) {
+                const defaultJson = JSON.stringify(settings.fieldOrders.defaultValue, null, '  ');
+                return `<textarea id="${id}" style="height:60px">${defaultJson}</textarea>`;
+            },
+            get: function (element) {
+                try {
+                    return JSON.parse(element.value);
+                }
+                catch (e) {
+                    console.error(e);
+                    return settings.fieldOrders.defaultValue;
+                }
+            },
+            set: function (element, value) {
+                if (typeof value !== 'object') {
+                    console.error(`unexpected fieldOrders value. ${value}`);
+                    value = settings.fieldOrders.defaultValue;
+                }
+
+                element.value = JSON.stringify(value, null, "  ");
+            },
+        };
+
+        // 페이지 로드 시 실행
+        window.onload = function () {
+            initializeDatabase(); // DB 및 컬렉션 초기화
+            loadSettingsFromLocalStorage(); // 설정 로드
+            loadFromLocalStorage(); // LocalStorage에서 데이터 로드
+        };
+
+        // DB 및 컬렉션 초기화
+        function initializeDatabase() {
+            logs = db.getCollection('logs'); // logs 컬렉션이 존재하는지 확인
+
+            if (!logs)
+                logs = db.addCollection('logs'); // 컬렉션이 없으면 생성
+            else
+                logs.clear(); // 이미 존재하면 초기화
         }
-        else {
-            saveSettingsToLocalStorage(true);
+
+        // 설정을 로컬 스토리지에 저장하는 함수
+        function saveSettingsToLocalStorage(isInit) {
+            const saveData = {};
+            for (let id in settings)
+                saveData[id] = getSettingValue(id);
+            localStorage.setItem('settings', JSON.stringify(saveData));
+
+            if (getSettingValue('saveRecentState'))
+                localStorage.setItem('fileList', JSON.stringify(fileNames));
+            else
+                clearSavedRecentState();
+
+            if (!isInit)
+                alert('saved settings');
         }
-    }
 
-    // 기본 설정값으로 변경하는 함수
-    function applyDefaultSettings() {
-        document.getElementById('timestampField').value = defaultSettings.timestampField;
-        document.getElementById('timestampFormat').value = defaultSettings.timestampFormat;
-        document.getElementById('saveRecentState').checked = defaultSettings.saveRecentState;
-        saveSettingsToLocalStorage(); // 기본값을 로컬 스토리지에 저장
-        executeQuery(); // 쿼리 갱신
-    }
+        // 설정 테이블을 렌더링하는 함수
+        function renderSettingsTable() {
+            const table = document.getElementById('settingsTable');
+            table.innerHTML = '';
+            for (let id in settings) {
+                const tr = document.createElement('tr');
 
-    // 최근 쿼리 결과 저장 여부를 확인하는 함수
-    function enableSaveRecentState() {
-        return document.getElementById('saveRecentState').checked;
-    }
+                const td1 = document.createElement('td');
+                td1.className = 'setting';
+                td1.innerHTML = `<label>${settings[id].displayName}</label>`;
 
-    // Apply 버튼 클릭 시 설정 저장 및 적용
-    document.getElementById('applySettings').addEventListener('click', function() {
-        saveSettingsToLocalStorage(); // 설정 저장
-        executeQuery(); // 설정 적용 후 다시 쿼리 실행
-    });
+                const td2 = document.createElement('td');
+                td2.className = 'setting';
+                td2.innerHTML = renderSetting(id);
 
-    // Discard 버튼 클릭 시 마지막 저장된 설정으로 복원
-    document.getElementById('discardSettings').addEventListener('click', function() {
-        loadSettingsFromLocalStorage();
-    });
+                tr.appendChild(td1);
+                tr.appendChild(td2);
+                table.appendChild(tr);
+            }
+        }
 
-    // Default 버튼 클릭 시 기본값 설정
-    document.getElementById('defaultSettings').addEventListener('click', function() {
-        applyDefaultSettings();
-    });
+        // 로컬 스토리지에서 설정을 로드하는 함수
+        function loadSettingsFromLocalStorage() {
+            document.getElementById('version').innerHTML = `version: ${version}`;
+            if (localStorage.getItem('version') !== version) {
+                localStorage.clear();
+                localStorage.setItem('version', version);
+            }
 
-    // 파일 선택 이벤트 리스너
-    document.getElementById('fileInput').addEventListener('change', function(event) {
-        const files = event.target.files;
-        if (files.length == 0)
-            return;
+            renderSettingsTable();
 
-        const fileList = document.getElementById('fileList');
-        fileList.innerHTML = ''; // 기존 파일 목록 삭제
-        fileNames = []; // 기존 파일 목록 삭제
-        logs.clear(); // 기존 컬렉션 초기화
+            const saveData = JSON.parse(localStorage.getItem('settings'));
+            if (saveData) {
+                for (let id in saveData)
+                    setSettingValue(id, saveData[id]);
+            }
+            else {
+                saveSettingsToLocalStorage(true);
+            }
+        }
 
-        // 파일 목록 표시
-        Array.from(files).forEach(file => {
-            const li = document.createElement('li');
-            li.textContent = file.webkitRelativePath || file.name; // 전체 경로 또는 파일 이름 표시
-            fileList.appendChild(li);
-            fileNames.push(file.webkitRelativePath || file.name);
+        // 기본 설정값으로 변경하는 함수
+        function applyDefaultSettings() {
+            renderSettingsTable();
+            saveSettingsToLocalStorage(); // 기본값을 로컬 스토리지에 저장
+            executeQuery(); // 쿼리 갱신
+        }
 
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const lines = e.target.result.split('\n').filter(line => line.trim() !== '');
-                const jsonDataArray = [];
-                lines.forEach(line => {
-                    try {
-                        const jsonData = JSON.parse(line);
-                        jsonDataArray.push(jsonData); // 데이터를 배열에 추가
-                    } catch (err) {
-                        console.error('Invalid JSON format:', line);
-                    }
-                });
-                // 타임스탬프 순으로 정렬 후 컬렉션에 삽입
-                const timestampField = document.getElementById('timestampField').value;
-                jsonDataArray.sort((a, b) => new Date(a[timestampField]) - new Date(b[timestampField]));
-                jsonDataArray.forEach(jsonData => logs.insert(jsonData));
-
-                executeQuery(); // 쿼리 실행 함수 호출
-            };
-            reader.readAsText(file);
+        // Apply 버튼 클릭 시 설정 저장 및 적용
+        document.getElementById('applySettings').addEventListener('click', function () {
+            saveSettingsToLocalStorage(); // 설정 저장
+            executeQuery(); // 설정 적용 후 다시 쿼리 실행
         });
 
-        // 파일 목록을 LocalStorage에 저장 (경로 기준 정렬)
-        fileNames.sort();
-        if (enableSaveRecentState())
-            localStorage.setItem('fileList', JSON.stringify(fileNames));
-    });
+        // Discard 버튼 클릭 시 마지막 저장된 설정으로 복원
+        document.getElementById('discardSettings').addEventListener('click', function () {
+            loadSettingsFromLocalStorage();
+        });
 
-    // 클리어 버튼 이벤트 리스너
-    document.getElementById('clearButton').addEventListener('click', function(){
-        clearSavedRecentState();
+        // Default 버튼 클릭 시 기본값 설정
+        document.getElementById('defaultSettings').addEventListener('click', function () {
+            applyDefaultSettings();
+        });
 
-        // 컬렉션 초기화
-        logs.clear();
-        // 파일 목록과 결과 테이블 초기화
-        document.getElementById('fileList').innerHTML = '';
-        document.getElementById('resultCount').textContent = '0';
-        document.getElementById('tableHeader').innerHTML = '';
-        document.getElementById('tableBody').innerHTML = '';
-        document.getElementById('queryBox').value = 'logs.find({})'; // 기본 쿼리로 설정
-        // 파일 입력 초기화
-        document.getElementById('fileInput').value = ''; // 파일 입력 리셋
+        // 파일 선택 이벤트 리스너
+        document.getElementById('fileInput').addEventListener('change', function (event) {
+            try {
+                const files = event.target.files;
+                if (files.length == 0)
+                    return;
 
-    });
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = ''; // 기존 파일 목록 삭제
+                fileNames = []; // 기존 파일 목록 삭제
+                logs.clear(); // 기존 컬렉션 초기화
 
-    function clearSavedRecentState() {
-        // LocalStorage 초기화 (설정은 유지)
-        const savedSettings = localStorage.getItem('settings'); // 설정 유지
-        localStorage.clear();
-        localStorage.setItem('settings', savedSettings); // 설정 복원
-    }
+                // 파일 목록 표시
+                Array.from(files).forEach(file => {
+                    const li = document.createElement('li');
+                    li.textContent = file.webkitRelativePath || file.name; // 전체 경로 또는 파일 이름 표시
+                    fileList.appendChild(li);
+                    fileNames.push(file.webkitRelativePath || file.name);
 
-    // 쿼리 실행 버튼 이벤트 리스너
-    document.getElementById('runQuery').addEventListener('click', executeQuery);
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        const lines = e.target.result.split('\n').filter(line => line.trim() !== '');
+                        const jsonDataArray = [];
+                        lines.forEach(line => {
+                            try {
+                                const jsonData = JSON.parse(line);
+                                jsonDataArray.push(jsonData); // 데이터를 배열에 추가
+                            } catch (err) {
+                                console.error('Invalid JSON format:', line);
+                            }
+                        });
+                        // 타임스탬프 순으로 정렬 후 컬렉션에 삽입
+                        const timestampField = getSettingValue('timestampField');
+                        jsonDataArray.sort((a, b) => new Date(a[timestampField]) - new Date(b[timestampField]));
+                        jsonDataArray.forEach(jsonData => logs.insert(jsonData));
 
-    // 쿼리 실행 및 테이블 렌더링 함수
-    function executeQuery() {
-        const queryBox = document.getElementById('queryBox');
-        let queryCode = queryBox.value.trim(); // 입력 값의 공백 제거
+                        executeQuery(); // 쿼리 실행 함수 호출
+                    };
+                    reader.readAsText(file);
+                });
 
-        // 공백일 경우 logs.find({})로 변경
-        if (queryCode === '') {
-            queryCode = 'logs.find({})';
-            queryBox.value = queryCode; // 기본값으로 설정
+                // 파일 목록을 LocalStorage에 저장 (경로 기준 정렬)
+                fileNames.sort();
+                if (getSettingValue('saveRecentState'))
+                    localStorage.setItem('fileList', JSON.stringify(fileNames));
+            }
+            finally {
+                // 다음에 동일한 파일을 선택해도 change 이벤트가 발생하도록 리셋
+                document.getElementById('fileInput').value = '';
+            }
+        });
+
+        // 클리어 버튼 이벤트 리스너
+        document.getElementById('clearButton').addEventListener('click', function () {
+            clearSavedRecentState();
+
+            // 컬렉션 초기화
+            logs.clear();
+            // 파일 목록과 결과 테이블 초기화
+            document.getElementById('fileList').innerHTML = '';
+            document.getElementById('resultCount').textContent = '0';
+            document.getElementById('tableHeader').innerHTML = '';
+            document.getElementById('tableBody').innerHTML = '';
+            document.getElementById('queryBox').value = 'logs.find({})'; // 기본 쿼리로 설정
+        });
+
+        function clearSavedRecentState() {
+            // LocalStorage 초기화 (설정은 유지)
+            const savedSettings = localStorage.getItem('settings'); // 설정 유지
+            localStorage.clear();
+            localStorage.setItem('settings', savedSettings); // 설정 복원
         }
 
-        let results;
-        try {
-            // eval로 JavaScript 코드 실행 및 logs.find() 호출
-            results = eval(queryCode); // JavaScript 코드 실행
-            if (!Array.isArray(results)) {
-                alert('Query must return an array of objects.');
+        // 쿼리 실행 버튼 이벤트 리스너
+        document.getElementById('runQuery').addEventListener('click', executeQuery);
+
+        // 쿼리 실행 및 테이블 렌더링 함수
+        function executeQuery() {
+            const queryBox = document.getElementById('queryBox');
+            let queryCode = queryBox.value.trim(); // 입력 값의 공백 제거
+
+            // 공백일 경우 logs.find({})로 변경
+            if (queryCode === '') {
+                queryCode = 'logs.find({})';
+                queryBox.value = queryCode; // 기본값으로 설정
+            }
+
+            let results;
+            try {
+                // eval로 JavaScript 코드 실행 및 logs.find() 호출
+                results = eval(queryCode); // JavaScript 코드 실행
+                if (!Array.isArray(results)) {
+                    alert('Query must return an array of objects.');
+                    return;
+                }
+            }
+            catch (err) {
+                alert('Query error: ' + err.message);
                 return;
             }
-            currentResult = results; // 현재 쿼리 결과 저장
-            renderTable(results); // 테이블 렌더링
-            if (enableSaveRecentState()) {
+
+            // 설정 
+            const timestampField = getSettingValue('timestampField');
+            const fieldOrders = getSettingValue('fieldOrders');
+            function getFieldOrder(field){
+                if (field === timestampField)
+                    return Number.NEGATIVE_INFINITY;
+                var order = fieldOrders[field];
+                if (typeof order === 'number')
+                    return order;
+                if (typeof order === 'string'){
+                    var number = Number.parseFloat(order);
+                    if (number !== NaN)
+                        return number;
+                }
+                return Number.POSITIVE_INFINITY;
+            }
+
+            // 모든 필드 수집
+            const fields = new Set();
+            results.forEach(row => Object.keys(row).forEach(field => {
+                if (field !== '$loki' && field !== 'meta') // loki 관련 필드 제외
+                    fields.add(field);
+            }));
+
+            // 필드 정렬
+            currentFields = Array.from(fields).sort((a, b) => {
+                var aOrder = getFieldOrder(a);
+                var bOrder = getFieldOrder(b);
+                if (aOrder < bOrder)
+                    return -1;
+                if (aOrder > bOrder)
+                    return 1;
+                return 0;
+            });
+
+            currentResults = results; // 현재 쿼리 결과 저장
+            renderTable(); // 테이블 렌더링
+            if (getSettingValue('saveRecentState')) {
                 localStorage.setItem('query', queryCode); // 쿼리를 LocalStorage에 저장
                 saveCollectionToLocalStorage(); // LocalStorage에 저장
             }
-        } catch (err) {
-            alert('Query error: ' + err.message);
         }
-    }
 
-    // 데이터를 테이블에 표시하고 결과 수 표시
-    function renderTable(result) {
-        const tableHeader = document.getElementById('tableHeader');
-        const tableBody = document.getElementById('tableBody');
-        const resultCount = document.getElementById('resultCount');
+        // 데이터를 테이블에 표시하고 결과 수 표시
+        function renderTable() {
+            const tableHeader = document.getElementById('tableHeader');
+            const tableBody = document.getElementById('tableBody');
+            const resultCount = document.getElementById('resultCount');
 
-        // 설정 로드
-        const timestampField = document.getElementById('timestampField').value;
-        const timestampFormat = document.getElementById('timestampFormat').value;
+            // 설정 로드
+            const timestampField = getSettingValue('timestampField');
+            const timestampFormat = getSettingValue('timestampFormat');
 
-        // 테이블 초기화
-        tableHeader.innerHTML = '';
-        tableBody.innerHTML = '';
-        resultCount.textContent = `${result.length} / ${logs.count()}`;
+            // 테이블 초기화
+            tableHeader.innerHTML = '';
+            tableBody.innerHTML = '';
+            resultCount.textContent = `${currentResults.length} / ${logs.count()}`;
 
-        if (result.length > 0) {
-            // 모든 레코드의 필드를 추출하여 헤더 생성
-            const fields = new Set();
-            result.forEach(row => Object.keys(row).forEach(field => {
-                if (field !== '$loki' && field !== 'meta') fields.add(field); // $loki와 meta 필드 제외
-            }));
-
-            // 헤더 생성
-            fields.forEach(field => {
-                const th = document.createElement('th');
-                th.textContent = field;
-                tableHeader.appendChild(th);
-            });
-
-            // 행 생성
-            result.forEach(row => {
-                const tr = document.createElement('tr');
-                fields.forEach(field => {
-                    const td = document.createElement('td');
-                    const pre = document.createElement('pre');
-
-                    // 타임스탬프 필드 형식 적용
-                    if (field === timestampField) {
-                        const timestampValue = new Date(row[field]);
-                        pre.textContent = timestampFormat === 'toUnixTimeStamp'
-                            ? timestampValue.getTime() / 1000
-                            : timestampValue[timestampFormat]();
-                    } else if (typeof row[field] === 'object') {
-                        pre.textContent = JSON.stringify(row[field], null, 2);
-                    } else {
-                        pre.textContent = row[field];
-                    }
-                    td.appendChild(pre);
-                    tr.appendChild(td);
+            if (currentResults.length > 0) {
+                // 헤더 생성
+                currentFields.forEach(field => {
+                    const th = document.createElement('th');
+                    th.textContent = field;
+                    tableHeader.appendChild(th);
                 });
-                tableBody.appendChild(tr);
+
+                // 행 생성
+                currentResults.forEach(row => {
+                    const tr = document.createElement('tr');
+                    currentFields.forEach(field => {
+                        const td = document.createElement('td');
+                        const pre = document.createElement('pre');
+
+                        // 타임스탬프 필드 형식 적용
+                        if (field === timestampField) {
+                            const timestampValue = new Date(row[field]);
+                            pre.textContent = timestampFormat === 'toUnixTimeStamp'
+                                ? timestampValue.getTime() / 1000
+                                : timestampValue[timestampFormat]();
+                        }
+                        else if (typeof row[field] === 'object') {
+                            pre.textContent = JSON.stringify(row[field], null, 2);
+                        }
+                        else {
+                            pre.textContent = row[field];
+                        }
+                        td.appendChild(pre);
+                        tr.appendChild(td);
+                    });
+                    tableBody.appendChild(tr);
+                });
+            }
+        }
+
+        // CSV 내보내기 기능
+        document.getElementById('exportCSV').addEventListener('click', function () {
+            if (currentResults.length === 0) {
+                alert("No data to export.");
+                return;
+            }
+
+            // 다운로드 경로 기본값 (기본 파일 이름)
+            const downloadPath = prompt('file name:', 'query_result.csv');
+            if (!downloadPath)
+                return;
+
+            // 헤더 추가
+            let csvContent = Array.from(currentFields).map(escapeCsvField).join(",") + "\n";
+
+            currentResults.forEach(row => {
+                const rowData = Array.from(currentFields).map(field => escapeCsvField(row[field]));
+                csvContent += rowData.join(",") + "\n"; // 각 행 추가
             });
-        }
-    }
 
-    // CSV 내보내기 기능
-    document.getElementById('exportCSV').addEventListener('click', function() {
-        if (currentResult.length === 0) {
-            alert("No data to export.");
-            return;
-        }
-
-        // 다운로드 경로 기본값 (기본 파일 이름)
-        const downloadPath = prompt('file name:', 'query_result.csv');
-        if (!downloadPath) {
-            return;
-        }
-
-        // 모든 필드를 추출
-        const allFields = new Set();
-        currentResult.forEach(row => Object.keys(row).forEach(field => {
-            if (field !== '$loki' && field !== 'meta') allFields.add(field); // $loki와 meta 필드 제외
-        }));
-
-        let csvContent = Array.from(allFields).map(escapeCsvField).join(",") + "\n"; // 헤더 추가
-
-        currentResult.forEach(row => {
-            const rowData = Array.from(allFields).map(field => escapeCsvField(row[field]));
-            csvContent += rowData.join(",") + "\n"; // 각 행 추가
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', downloadPath);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         });
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', downloadPath);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    });
+        // CSV 필드의 특수 문자 처리, JSON 객체는 들여쓰기 적용
+        function escapeCsvField(field) {
+            if (field === undefined || field === null) return '';
 
-    // CSV 필드의 특수 문자 처리, JSON 객체는 들여쓰기 적용
-    function escapeCsvField(field) {
-        if (field === undefined || field === null) return '';
+            const fieldStr = typeof field === 'object' ? JSON.stringify(field, null, 2) : String(field);
 
-        const fieldStr = typeof field === 'object' ? JSON.stringify(field, null, 2) : String(field);
-
-        // 필드에 쉼표, 따옴표, 개행이 있으면 따옴표로 감싸고 내부 따옴표는 이스케이프 처리
-        if (/[,"\n]/.test(fieldStr)) {
-            return `"${fieldStr.replace(/"/g, '""')}"`;
+            // 필드에 쉼표, 따옴표, 개행이 있으면 따옴표로 감싸고 내부 따옴표는 이스케이프 처리
+            if (/[,"\n]/.test(fieldStr)) {
+                return `"${fieldStr.replace(/"/g, '""')}"`;
+            }
+            return fieldStr;
         }
-        return fieldStr;
-    }
 
-    // LocalStorage에서 파일 목록 및 쿼리 로드
-    function loadFromLocalStorage() {
-        if (!enableSaveRecentState())
-            return;
+        // LocalStorage에서 파일 목록 및 쿼리 로드
+        function loadFromLocalStorage() {
+            if (!getSettingValue('saveRecentState'))
+                return;
 
-        fileNames = JSON.parse(localStorage.getItem('fileList'));
-        const savedQuery = localStorage.getItem('query');
-        const savedCollectionData = JSON.parse(localStorage.getItem('collectionData'));
-        const fileList = document.getElementById('fileList');
-        const queryBox = document.getElementById('queryBox');
+            fileNames = JSON.parse(localStorage.getItem('fileList'));
+            const savedQuery = localStorage.getItem('query');
+            const savedCollectionData = JSON.parse(localStorage.getItem('collectionData'));
+            const fileList = document.getElementById('fileList');
+            const queryBox = document.getElementById('queryBox');
 
-        if (fileNames && fileNames.length > 0) {
-            fileList.innerHTML = '';
-            fileNames.forEach(fileName => {
-                const li = document.createElement('li');
-                li.textContent = fileName;
-                fileList.appendChild(li);
+            if (fileNames && fileNames.length > 0) {
+                fileList.innerHTML = '';
+                fileNames.forEach(fileName => {
+                    const li = document.createElement('li');
+                    li.textContent = fileName;
+                    fileList.appendChild(li);
+                });
+            }
+
+            if (savedCollectionData && savedCollectionData.length > 0) {
+                // 저장된 데이터를 컬렉션에 다시 삽입 ($loki, meta 필드 제외)
+                savedCollectionData.forEach(item => {
+                    const { $loki, meta, ...cleanItem } = item;
+                    logs.insert(cleanItem);
+                });
+            }
+
+            if (savedQuery) {
+                queryBox.value = savedQuery;
+                executeQuery(); // 쿼리 실행 함수 호출
+            }
+            else if (savedCollectionData && savedCollectionData.length > 0) {
+                renderTable(logs.find()); // 모든 데이터 표시
+            }
+        }
+
+        // 컬렉션 데이터를 LocalStorage에 저장 (Loki 필드 제외)
+        function saveCollectionToLocalStorage() {
+            if (!getSettingValue('saveRecentState'))
+                return;
+
+            const cleanData = logs.data.map(item => {
+                const { $loki, meta, ...cleanItem } = item; // $loki 및 meta 필드 제외
+                return cleanItem;
             });
+            localStorage.setItem('collectionData', JSON.stringify(cleanData));
         }
 
-        if (savedCollectionData && savedCollectionData.length > 0) {
-            // 저장된 데이터를 컬렉션에 다시 삽입 ($loki, meta 필드 제외)
-            savedCollectionData.forEach(item => {
-                const { $loki, meta, ...cleanItem } = item;
-                logs.insert(cleanItem);
-            });
+        // 섹션의 표시 여부를 토글하는 함수
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (section.style.display === 'none' || section.style.display === '') {
+                section.style.display = 'block';
+            }
+            else {
+                section.style.display = 'none';
+            }
         }
-
-        if (savedQuery) {
-            queryBox.value = savedQuery;
-            executeQuery(); // 쿼리 실행 함수 호출
-        } else if (savedCollectionData && savedCollectionData.length > 0) {
-            renderTable(logs.find()); // 모든 데이터 표시
-        }
-    }
-
-    // 컬렉션 데이터를 LocalStorage에 저장 (Loki 필드 제외)
-    function saveCollectionToLocalStorage() {
-        if (!enableSaveRecentState())
-            return;
-
-        const cleanData = logs.data.map(item => {
-            const { $loki, meta, ...cleanItem } = item; // $loki 및 meta 필드 제외
-            return cleanItem;
-        });
-        localStorage.setItem('collectionData', JSON.stringify(cleanData));
-    }
-
-    // 섹션의 표시 여부를 토글하는 함수
-    function toggleSection(sectionId) {
-        const section = document.getElementById(sectionId);
-        if (section.style.display === 'none' || section.style.display === '') {
-            section.style.display = 'block';
-        } else {
-            section.style.display = 'none';
-        }
-    }
-</script>
+    </script>
 
 </body>
+
 </html>
