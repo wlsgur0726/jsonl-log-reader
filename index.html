@@ -3,6 +3,11 @@
 <head>
     <meta charset="viewport" content="width=device-width, initial-scale=1.0">
     <title>JSONL Log Reader</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/theme/material.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.0/mode/javascript/javascript.min.js"></script>
     <style>
         body {
             background-color: #121212; /* 배경 색상 */
@@ -65,11 +70,10 @@
             text-align: left;
             font-weight: bold;
         }
-        .content {
+        .content-section {
             padding-left: 10px;
             padding-right: 10px;
-            padding-bottom: 10px;
-            display: none;
+            padding-bottom: 20px;
             overflow: hidden;
         }
         .setting {
@@ -96,8 +100,10 @@
             display: flex; /* 버튼과 텍스트 영역을 같은 줄에 배치 */
             align-items: stretch; /* 아이템 높이 맞춤 */
         }
-        #queryBox {
+        .CodeMirror {
             width: 100%;
+            height: 100px;
+            resize: both;
         }
     </style>
 </head>
@@ -108,7 +114,7 @@
     <hr />
 
     <div class="collapsible" onclick="toggleSection('fileSection')">Files</div>
-    <div id="fileSection" class="content">
+    <div id="fileSection" class="content-section" style="display: none;">
         <input type="file" id="fileInput" multiple accept=".jsonl" style="display: none;">
         <label for="fileInput" class="common-button">Select Files</label>
         <button id="clearButton" class="common-button">Clear</button> <!-- 클리어 버튼 -->
@@ -116,7 +122,7 @@
     </div>
 
     <div class="collapsible" onclick="toggleSection('settingsSection')">Settings</div>
-    <div id="settingsSection" class="content">
+    <div id="settingsSection" class="content-section" style="display: none;">
         <p>
             <label id="version"></label>
             <table id="settingsTable"></table>
@@ -127,7 +133,7 @@
     </div>
 
     <div class="collapsible" onclick="toggleSection('querySection')">Query</div>
-    <div id="querySection" class="content">
+    <div id="querySection" class="content-section">
         <p>
             <a href="https://github.com/techfort/LokiJS/wiki/Query-Examples" target="_blank">
                 LokiJS Query Syntax Documentation
@@ -135,13 +141,13 @@
         </p>
         <div class="query-container">
             <button id="runQuery" class="common-button">Exec</button> <!-- 쿼리 실행 버튼 -->
-            <textarea id="queryBox">logs.find({})</textarea> <!-- 기본값 -->
+            <textarea id="queryEditor"></textarea>
         </div>
     </div>
 
     <hr />
 
-    <div id="resultSection" class="content" style="display: block;">
+    <div id="resultSection" class="content-section">
         Results: <span id="resultCount">0 / 0</span>
         <button id="exportCSV" class="common-button">Export as CSV</button>
     </div>
@@ -158,12 +164,25 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lokijs/1.5.12/lokijs.min.js"></script>
     <script>
         const version = '20241016';
+        const defaultQuery = 'logs.find({});';
 
         let db = new loki('jsonl.db'); // LokiJS DB 초기화
         let logs; // 로그 컬렉션 변수
         let fileNames = []; // 로드한 파일들
         let currentResults = []; // 현재 쿼리 결과 저장 변수
         let currentFields = []; // 현재 쿼리 결과의 필드들 저장 변수
+
+        // queryEditor에 CodeMirror적용
+        const queryEditor = CodeMirror.fromTextArea(document.getElementById('queryEditor'), {
+            mode: "javascript",
+            indentUnit: 4,
+            tabSize: 4,
+            //indentWithTabs: true,  // 탭으로 들여쓰기
+            lineNumbers : true,  // 줄 번호 표시
+            //lineWrapping: true,  // 줄 넘김
+            theme: "material"  // 어두운 테마 적용 (Material 테마)
+        });
+        queryEditor.setValue(defaultQuery);
 
         // 설정들
         const settings = {};
@@ -423,7 +442,7 @@
             document.getElementById('resultCount').textContent = '0';
             document.getElementById('tableHeader').innerHTML = '';
             document.getElementById('tableBody').innerHTML = '';
-            document.getElementById('queryBox').value = 'logs.find({})'; // 기본 쿼리로 설정
+            queryEditor.setValue(defaultQuery); // 기본 쿼리로 설정
         });
 
         function clearSavedRecentState() {
@@ -438,13 +457,12 @@
 
         // 쿼리 실행 및 테이블 렌더링 함수
         function executeQuery() {
-            const queryBox = document.getElementById('queryBox');
-            let queryCode = queryBox.value.trim(); // 입력 값의 공백 제거
+            let queryCode = queryEditor.getValue();
 
             // 공백일 경우 logs.find({})로 변경
-            if (queryCode === '') {
-                queryCode = 'logs.find({})';
-                queryBox.value = queryCode; // 기본값으로 설정
+            if (typeof queryCode !== 'string' || queryCode.trim() === '') {
+                queryCode = defaultQuery;
+                queryEditor.setValue(queryCode); // 기본값으로 설정
             }
 
             let results;
@@ -608,7 +626,6 @@
             const savedQuery = localStorage.getItem('query');
             const savedCollectionData = JSON.parse(localStorage.getItem('collectionData'));
             const fileList = document.getElementById('fileList');
-            const queryBox = document.getElementById('queryBox');
 
             if (fileNames && fileNames.length > 0) {
                 fileList.innerHTML = '';
@@ -628,7 +645,7 @@
             }
 
             if (savedQuery) {
-                queryBox.value = savedQuery;
+                queryEditor.setValue(savedQuery);
                 executeQuery(); // 쿼리 실행 함수 호출
             }
             else if (savedCollectionData && savedCollectionData.length > 0) {
@@ -651,12 +668,10 @@
         // 섹션의 표시 여부를 토글하는 함수
         function toggleSection(sectionId) {
             const section = document.getElementById(sectionId);
-            if (section.style.display === 'none' || section.style.display === '') {
+            if (section.style.display === 'none')
                 section.style.display = 'block';
-            }
-            else {
+            else
                 section.style.display = 'none';
-            }
         }
     </script>
 
